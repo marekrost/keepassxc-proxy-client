@@ -163,6 +163,19 @@ class Connection:
         else:
             return response["entries"]
 
+    def get_totp(self, uuid):
+        msg = {
+            "action": "get-totp",
+            "uuid": uuid
+        }
+        self.send_encrypted_message(msg)
+        response = self.get_encrypted_response()
+
+        if not response["success"]:
+            return False
+        else:
+            return response["totp"]
+
     def get_database_groups(self):
         msg = {
             "action": "get-database-groups",

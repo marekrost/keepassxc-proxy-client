@@ -18,6 +18,11 @@ keepassxc_proxy_client get <file> <url>: Reads a keepassxc association from
 association is not valid for the running keepassxc instance or the no logins are
 found for the given URL.
 
+keepassxc_proxy_client totp <file> <uuid>: Reads a keepassxc association from
+<file> and attempts to get the current totp for <uuid>. Will exit with 1 if the
+association is not valid for the running keepassxc instance or the no totp is
+found for the given UUID.
+
 keepassxc_proxy_client unlock <file>: Causes a running KeepassXC instance
 to launch a dialogue window to allow the user to unlock a locked database.
 If the database is already unlocked it has no effect.
@@ -94,6 +99,34 @@ def main():
 
         print(connection.test_associate(True))
 
+        sys.exit(0)
+    elif command == "totp":
+        if len(sys.argv) < 4:
+            print("Too little arguments provided, see --help for usage")
+            sys.exit(1)
+
+        associate_file = sys.argv[2]
+        uuid = sys.argv[3]
+
+        association = json.load(open(associate_file, "r"))
+
+        connection = keepassxc_proxy_client.protocol.Connection()
+        connection.connect()
+        connection.load_associate(
+            association["name"],
+            base64.b64decode(association["public_key"].encode("utf-8"))
+        )
+
+        if not connection.test_associate():
+            print("The loaded association is invalid")
+            sys.exit(1)
+
+        totp = connection.get_totp(uuid)
+        if not totp:
+            print("No totp found for the given UUID")
+            sys.exit(1)
+
+        print(totp)
         sys.exit(0)
     else:
         print("Unkown subcommand, see --help for usage")
