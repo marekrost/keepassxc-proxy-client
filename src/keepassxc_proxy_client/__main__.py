@@ -130,20 +130,38 @@ def cmd_get(args):
         print("No logins found for the given URL", file=sys.stderr)
         sys.exit(1)
 
+    entries = logins if args.all else logins[:1]
+
+    if not args.all and len(logins) > 1:
+        print(
+            "warning: %d entries match this URL; printing the first. "
+            "Pass --all to print every match." % len(logins),
+            file=sys.stderr,
+        )
+
     try:
-        value = _extract_field(logins[0], args.field)
+        values = [_extract_field(e, args.field) for e in entries]
     except ValueError as e:
         print("error: %s" % e, file=sys.stderr)
         sys.exit(1)
 
-    if value is None:
-        print(
-            "field %r is not present on the matching entry" % args.field,
-            file=sys.stderr,
-        )
+    missing = [i for i, v in enumerate(values) if v is None]
+    if missing:
+        if len(entries) == 1:
+            print(
+                "field %r is not present on the matching entry" % args.field,
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "field %r is not present on %d of %d matching entries"
+                % (args.field, len(missing), len(entries)),
+                file=sys.stderr,
+            )
         sys.exit(1)
 
-    print(value)
+    for v in values:
+        print(v)
 
 
 def cmd_totp(args):
@@ -259,6 +277,16 @@ def build_parser():
             "Which entry field to print. One of: password (default), "
             "login/username, name/title, uuid, attr:<KEY> for a KeePassXC "
             "custom string attribute. Case-insensitive."
+        ),
+    )
+    p_get.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help=(
+            "Print the chosen field for every matching entry, one value per "
+            "line. Default: print only the first match and emit a warning to "
+            "stderr if more than one matched."
         ),
     )
     p_get.add_argument("url", help="URL to look up.")
