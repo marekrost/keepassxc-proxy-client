@@ -122,25 +122,27 @@ def _extract_field(entry, field):
     raise ValueError("unknown field %r" % field)
 
 
-def cmd_get(args):
-    connection = _connect_and_authenticate(args.file, args.id)
+def _emit_field(matches, field, all_flag, match_description):
+    """Print `field` for one or all of `matches`, with consistent UX.
 
-    logins = connection.get_logins(args.url)
-    if not logins:
-        print("No logins found for the given URL", file=sys.stderr)
+    `match_description` is a short noun phrase like "URL" or "path" used in
+    user-facing messages. Exits non-zero on field errors.
+    """
+    if not matches:
+        print("No entries found for the given %s" % match_description, file=sys.stderr)
         sys.exit(1)
 
-    entries = logins if args.all else logins[:1]
+    entries = matches if all_flag else matches[:1]
 
-    if not args.all and len(logins) > 1:
+    if not all_flag and len(matches) > 1:
         print(
-            "warning: %d entries match this URL; printing the first. "
-            "Pass --all to print every match." % len(logins),
+            "warning: %d entries match this %s; printing the first. "
+            "Pass --all to print every match." % (len(matches), match_description),
             file=sys.stderr,
         )
 
     try:
-        values = [_extract_field(e, args.field) for e in entries]
+        values = [_extract_field(e, field) for e in entries]
     except ValueError as e:
         print("error: %s" % e, file=sys.stderr)
         sys.exit(1)
@@ -149,19 +151,64 @@ def cmd_get(args):
     if missing:
         if len(entries) == 1:
             print(
-                "field %r is not present on the matching entry" % args.field,
+                "field %r is not present on the matching entry" % field,
                 file=sys.stderr,
             )
         else:
             print(
                 "field %r is not present on %d of %d matching entries"
-                % (args.field, len(missing), len(entries)),
+                % (field, len(missing), len(entries)),
                 file=sys.stderr,
             )
         sys.exit(1)
 
     for v in values:
         print(v)
+
+
+def cmd_get(args):
+    connection = _connect_and_authenticate(args.file, args.id)
+    logins = connection.get_logins(args.url) or []
+    _emit_field(logins, args.field, args.all, "URL")
+
+
+def _normalize_path(path):
+    """Normalize a user-supplied entry path to `comp1/comp2/.../title`.
+
+    Leading slash is optional. Empty components are dropped.
+    """
+    return "/".join(c for c in path.split("/") if c)
+
+
+def _entry_full_path(entry):
+    """Return the slash-joined `group/title` for a get-database-entries entry."""
+    group = entry.get("group", "") or ""
+    title = entry.get("title", "") or ""
+    if group:
+        return group.rstrip("/") + "/" + title
+    return title
+
+
+def cmd_get_by_path(args):
+    connection = _connect_and_authenticate(args.file, args.id)
+
+    try:
+        response = connection.get_database_entries()
+    except keepassxc_proxy_client.protocol.ResponseUnsuccesfulException as e:
+        print(
+            "error querying database entries: %s\n"
+            "(this action requires \"Allow access to entries\" in KeePassXC's "
+            "Browser Integration settings for the chosen association)" % e,
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    target = _normalize_path(args.path)
+    matches = [
+        e for e in (response.get("entries") or [])
+        if _normalize_path(_entry_full_path(e)) == target
+    ]
+    _emit_field(matches, args.field, args.all, "path")
 
 
 def cmd_totp(args):
@@ -225,6 +272,29 @@ def _add_id_arg(p):
     )
 
 
+def _add_field_and_all_args(p):
+    p.add_argument(
+        "--field",
+        "-F",
+        default="password",
+        help=(
+            "Which entry field to print. One of: password (default), "
+            "login/username, name/title, uuid, attr:<KEY> for a KeePassXC "
+            "custom string attribute. Case-insensitive."
+        ),
+    )
+    p.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help=(
+            "Print the chosen field for every matching entry, one value per "
+            "line. Default: print only the first match and emit a warning to "
+            "stderr if more than one matched."
+        ),
+    )
+
+
 def build_parser():
     default_keystore = keystore.default_path()
     parser = argparse.ArgumentParser(
@@ -269,28 +339,33 @@ def build_parser():
     )
     _add_file_arg(p_get, default_keystore)
     _add_id_arg(p_get)
-    p_get.add_argument(
-        "--field",
-        "-F",
-        default="password",
-        help=(
-            "Which entry field to print. One of: password (default), "
-            "login/username, name/title, uuid, attr:<KEY> for a KeePassXC "
-            "custom string attribute. Case-insensitive."
-        ),
-    )
-    p_get.add_argument(
-        "--all",
-        "-a",
-        action="store_true",
-        help=(
-            "Print the chosen field for every matching entry, one value per "
-            "line. Default: print only the first match and emit a warning to "
-            "stderr if more than one matched."
-        ),
-    )
+    _add_field_and_all_args(p_get)
     p_get.add_argument("url", help="URL to look up.")
     p_get.set_defaults(func=cmd_get)
+
+    p_gbp = sub.add_parser(
+        "get-by-path",
+        help="Get an entry by its location in the database tree.",
+        description=(
+            "Look up an entry by its group/title path within the database. "
+            "Requires \"Allow access to entries\" enabled for the chosen "
+            "association in KeePassXC's Browser Integration settings. "
+            "Unlike `get`, this returns metadata from the full database tree "
+            "(scoped to what the association is permitted to see), not just "
+            "URL-keyed lookups."
+        ),
+    )
+    _add_file_arg(p_gbp, default_keystore)
+    _add_id_arg(p_gbp)
+    _add_field_and_all_args(p_gbp)
+    p_gbp.add_argument(
+        "path",
+        help=(
+            "Slash-separated entry path: group/subgroup/.../title. Leading "
+            "slash is optional. Case-sensitive."
+        ),
+    )
+    p_gbp.set_defaults(func=cmd_get_by_path)
 
     p_totp = sub.add_parser(
         "totp",
