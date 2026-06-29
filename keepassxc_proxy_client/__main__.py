@@ -89,6 +89,39 @@ def cmd_create(args):
     print(json.dumps(out))
 
 
+_DIRECT_FIELDS = {
+    "password": "password",
+    "login": "login",
+    "username": "login",
+    "name": "name",
+    "title": "name",
+    "uuid": "uuid",
+}
+
+
+def _extract_field(entry, field):
+    """Return the requested field from a get-logins entry.
+
+    `field` is the user-supplied --field value (case-insensitive). Supports the
+    direct fields in _DIRECT_FIELDS and `attr:<KEY>` for KeePassXC custom
+    string attributes (which are stored as `KPH: <KEY>` in `stringFields`).
+    Returns None if the field is not present on the entry.
+    """
+    key = field.lower()
+    if key in _DIRECT_FIELDS:
+        return entry.get(_DIRECT_FIELDS[key])
+
+    if key.startswith("attr:"):
+        attr_name = field.split(":", 1)[1]
+        for sf in entry.get("stringFields", []) or []:
+            value = sf.get("KPH: " + attr_name)
+            if value is not None:
+                return value
+        return None
+
+    raise ValueError("unknown field %r" % field)
+
+
 def cmd_get(args):
     connection = _connect_and_authenticate(args.file, args.id)
 
@@ -97,7 +130,20 @@ def cmd_get(args):
         print("No logins found for the given URL", file=sys.stderr)
         sys.exit(1)
 
-    print(logins[0]["password"])
+    try:
+        value = _extract_field(logins[0], args.field)
+    except ValueError as e:
+        print("error: %s" % e, file=sys.stderr)
+        sys.exit(1)
+
+    if value is None:
+        print(
+            "field %r is not present on the matching entry" % args.field,
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    print(value)
 
 
 def cmd_totp(args):
@@ -205,6 +251,16 @@ def build_parser():
     )
     _add_file_arg(p_get, default_keystore)
     _add_id_arg(p_get)
+    p_get.add_argument(
+        "--field",
+        "-F",
+        default="password",
+        help=(
+            "Which entry field to print. One of: password (default), "
+            "login/username, name/title, uuid, attr:<KEY> for a KeePassXC "
+            "custom string attribute. Case-insensitive."
+        ),
+    )
     p_get.add_argument("url", help="URL to look up.")
     p_get.set_defaults(func=cmd_get)
 
