@@ -101,7 +101,7 @@ def build_parser():
 
     p_get = sub.add_parser(
         "get",
-        help="Get the first password for a URL.",
+        help="Get a field for an entry matched by URL.",
         description=(
             "Look up an entry by URL. If --file is omitted, the OS-default "
             "keystore is used. If --id is omitted, all stored associations are "
@@ -116,7 +116,7 @@ def build_parser():
 
     p_gbp = sub.add_parser(
         "get-by-path",
-        help="Get an entry by its location in the database tree.",
+        help="Get a field for an entry matched by group/title path.",
         description=(
             "Look up an entry by its group/title path within the database. "
             "Requires \"Allow access to entries\" enabled for the chosen "
@@ -153,7 +153,7 @@ def build_parser():
 
     p_unlock = sub.add_parser(
         "unlock",
-        help="Ask a running KeePassXC to prompt the user to unlock a database.",
+        help="Ask KeePassXC to prompt the user to unlock a database.",
         description=(
             "Causes a running KeePassXC instance to launch a dialogue window to "
             "allow the user to unlock a locked database. If the database is "
