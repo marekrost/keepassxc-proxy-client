@@ -131,7 +131,7 @@ Global flags: `--socket PATH` overrides the auto-detected socket path;
 # 1. Authorize this client against the unlocked .kdbx.
 #    KeePassXC will open a "Save key to database?" dialog.
 $ keepassxc_proxy_client create --save
-saved association id 'my-laptop' to /home/marek/.config/keepassxc-proxy-client/keys.json
+saved association id 'my-laptop' to /home/user/.config/keepassxc-proxy-client/keys.json
 
 # 2. Read a password by URL.
 $ keepassxc_proxy_client get https://github.com
