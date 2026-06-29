@@ -1,7 +1,10 @@
 import argparse
+import sys
+import traceback
 
 from keepassxc_proxy_client import keystore
 from keepassxc_proxy_client import commands
+from keepassxc_proxy_client.errors import ProxyClientError
 
 
 def _add_file_arg(p, default):
@@ -54,6 +57,20 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="keepassxc_proxy_client",
         description="Client for the KeePassXC Browser Integration protocol.",
+    )
+    parser.add_argument(
+        "--socket",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Override the auto-detected KeePassXC Browser Integration socket "
+            "path. Default detection follows Connection.get_socket_path()."
+        ),
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print Python tracebacks on error in addition to the one-line message.",
     )
     sub = parser.add_subparsers(dest="command", required=True, metavar="<command>")
 
@@ -160,7 +177,18 @@ def build_parser():
 def main():
     parser = build_parser()
     args = parser.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except ProxyClientError as e:
+        print(str(e), file=sys.stderr)
+        if args.debug:
+            traceback.print_exc()
+        sys.exit(e.exit_code)
+    except Exception:
+        # Unanticipated failure — always print the traceback. argparse exits
+        # for its own errors before we get here.
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
