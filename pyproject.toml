@@ -54,4 +54,4 @@ dev = ["pytest>=7"]
 packages = ["src/keepassxc_proxy_client"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/unit"]
