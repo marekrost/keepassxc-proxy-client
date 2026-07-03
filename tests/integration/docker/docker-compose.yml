@@ -1,0 +1,55 @@
+# Two-service stack for the integration tests.
+#
+# Bring it up from the repo root:
+#   docker compose -f tests/integration/docker/docker-compose.yml up --build
+#
+# Then open http://localhost:6080 to see the KeePassXC window and approve the
+# Browser Integration association dialog when prompted by a test.
+#
+# The `kpxc-socket` named volume is the mechanism that lets the client container
+# reach the unix-domain socket KeePassXC creates. It's mounted at the same path
+# in both containers (/run/user/1000), and both run as uid 1000 so permissions
+# line up. The host filesystem isn't involved — that's what keeps the setup
+# identical on Linux, macOS, and Windows.
+
+services:
+  keepassxc:
+    build:
+      context: .
+      dockerfile: keepassxc.Dockerfile
+      args:
+        KPXC_VERSION: ${KPXC_VERSION:-}
+    image: kpxc-test-keepassxc
+    container_name: kpxc-test-keepassxc
+    ports:
+      - "6080:6080"
+    volumes:
+      - kpxc-socket:/run/user/1000
+      - ../fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /run/user/1000/org.keepassxc.KeePassXC.BrowserServer"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 20s
+
+  client:
+    build:
+      context: ../../..
+      dockerfile: tests/integration/docker/client.Dockerfile
+    image: kpxc-test-client
+    container_name: kpxc-test-client
+    depends_on:
+      keepassxc:
+        condition: service_healthy
+    volumes:
+      - ../../..:/workspace
+      - kpxc-socket:/run/user/1000
+    # stdin_open + tty so the human_step prompts in conftest are interactive.
+    stdin_open: true
+    tty: true
+    environment:
+      KPXC_TEST_NOVNC_URL: "http://localhost:6080"
+
+volumes:
+  kpxc-socket:

@@ -48,10 +48,14 @@ Issues = "https://github.com/hargoniX/keepassxc-proxy-client/issues"
 Changelog = "https://github.com/hargoniX/keepassxc-proxy-client/blob/master/CHANGELOG.md"
 
 [dependency-groups]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "pykeepass>=4.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/keepassxc_proxy_client"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
+markers = [
+    "integration: requires the Docker-based KeePassXC test stack (see tests/integration/README.md)",
+    "slow: noticeably slow tests",
+]

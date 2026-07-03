@@ -242,6 +242,10 @@ src/keepassxc_proxy_client/
   errors.py       # ProxyClientError hierarchy + exit codes
   commands.py     # cmd_* handlers (cli logic)
   __main__.py     # argparse wiring + main()
+tests/
+  unit/           # pure-Python tests, no external processes — `uv run pytest`
+  integration/    # end-to-end against a real KeePassXC in Docker (noVNC for the
+                  # human-in-the-loop dialogs). See tests/integration/README.md.
 ```
 
 ## License
