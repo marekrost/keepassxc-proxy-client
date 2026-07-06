@@ -1,8 +1,34 @@
+import base64
 import json
 import sys
 
 import keepassxc_proxy_client.protocol
 from keepassxc_proxy_client import keystore
+
+
+def _resolve_path(args):
+    return args.file if args.file else keystore.default_path()
+
+
+def _authenticate(connection, path):
+    """Try every association stored at `path` until one authenticates.
+
+    Returns True on success. Prints a diagnostic and returns False if the
+    keystore is empty or no candidate authenticated.
+    """
+    ids = keystore.list_associations(path)
+    if not ids:
+        print("No associations stored in %s" % path)
+        return False
+
+    for assoc_id in ids:
+        key_bytes = keystore.load(path, assoc_id)
+        connection.load_associate(assoc_id, key_bytes)
+        if connection.test_associate():
+            return True
+
+    print("None of the stored associations authenticated against the running KeePassXC instance")
+    return False
 
 
 def cmd_create(args):
@@ -15,18 +41,21 @@ def cmd_create(args):
         sys.exit(1)
 
     name, public_key = connection.dump_associate()
-    print(json.dumps(keystore.dump_association(name, public_key)))
+    out = {
+        "version": keystore.SCHEMA_VERSION,
+        "associations": {
+            name: base64.b64encode(public_key).decode("ascii"),
+        },
+    }
+    print(json.dumps(out))
 
 
 def cmd_get(args):
-    name, public_key = keystore.load_association(args.file)
+    path = _resolve_path(args)
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    connection.load_associate(name, public_key)
-
-    if not connection.test_associate():
-        print("The loaded association is invalid")
+    if not _authenticate(connection, path):
         sys.exit(1)
 
     logins = connection.get_logins(args.url)
@@ -38,14 +67,11 @@ def cmd_get(args):
 
 
 def cmd_totp(args):
-    name, public_key = keystore.load_association(args.file)
+    path = _resolve_path(args)
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    connection.load_associate(name, public_key)
-
-    if not connection.test_associate():
-        print("The loaded association is invalid")
+    if not _authenticate(connection, path):
         sys.exit(1)
 
     totp_value = connection.get_totp(args.uuid)
@@ -57,10 +83,11 @@ def cmd_totp(args):
 
 
 def cmd_unlock(args):
-    name, public_key = keystore.load_association(args.file)
+    path = _resolve_path(args)
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    connection.load_associate(name, public_key)
+    if not _authenticate(connection, path):
+        sys.exit(1)
 
     print(connection.test_associate(True))
