@@ -21,12 +21,24 @@ def build_parser():
         help="Create a new association with a running KeePassXC instance.",
         description=(
             "Connects to a locally running keepassxc instance and creates a new "
-            "association (this will prompt a dialogue from KeePassXC). The "
-            "association is printed to stdout as JSON. Note that the public key "
-            "printed is secret and should be stored safely."
+            "association (this will prompt a dialogue from KeePassXC). Without "
+            "--save the association is printed to stdout as JSON. With --save it "
+            "is persisted to the keystore file under the id returned by "
+            "KeePassXC."
         ),
     )
     p_create.add_argument("file", nargs="?", default=None, help=_FILE_HELP)
+    p_create.add_argument(
+        "--save",
+        "-s",
+        action="store_true",
+        help="Persist the new association to the keystore file instead of printing it.",
+    )
+    p_create.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing association with the same id (use with --save).",
+    )
     p_create.set_defaults(func=commands.cmd_create)
 
     p_get = sub.add_parser(

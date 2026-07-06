@@ -41,6 +41,18 @@ def cmd_create(args):
         sys.exit(1)
 
     name, public_key = connection.dump_associate()
+
+    if args.save:
+        path = _resolve_path(args)
+        try:
+            keystore.save(path, name, public_key, force=args.force)
+        except keystore.AssociationExists as e:
+            print(str(e))
+            print("Re-run with --force to overwrite.")
+            sys.exit(1)
+        print("Saved association %r to %s" % (name, path))
+        return
+
     out = {
         "version": keystore.SCHEMA_VERSION,
         "associations": {
