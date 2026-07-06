@@ -1,15 +1,19 @@
 import argparse
 
-from keepassxc_proxy_client import commands
+from keepassxc_proxy_client import commands, keystore
 
 
-_FILE_HELP = (
-    "Path to the keystore JSON file. If omitted, the OS-default location is "
-    "used (see keystore.default_path)."
-)
+def _add_file_arg(p, default):
+    p.add_argument(
+        "--file",
+        "-f",
+        default=default,
+        help="Path to the keystore JSON file. Defaults to %(default)s.",
+    )
 
 
 def build_parser():
+    default_keystore = keystore.default_path()
     parser = argparse.ArgumentParser(
         prog="keepassxc_proxy_client",
         description="Client for the KeePassXC Browser Integration protocol.",
@@ -27,7 +31,7 @@ def build_parser():
             "KeePassXC."
         ),
     )
-    p_create.add_argument("file", nargs="?", default=None, help=_FILE_HELP)
+    _add_file_arg(p_create, default_keystore)
     p_create.add_argument(
         "--save",
         "-s",
@@ -45,13 +49,13 @@ def build_parser():
         "get",
         help="Get the first password for an entry matched by URL.",
         description=(
-            "Reads keepassxc associations from <file> and attempts to get the "
-            "first password for <url>. Each stored association is tried until "
-            "one authenticates. Exits with 1 if no association authenticates "
-            "or no logins are found."
+            "Reads keepassxc associations from the keystore file and attempts "
+            "to get the first password for <url>. Each stored association is "
+            "tried until one authenticates. Exits with 1 if no association "
+            "authenticates or no logins are found."
         ),
     )
-    p_get.add_argument("file", help="Path to the keystore JSON file.")
+    _add_file_arg(p_get, default_keystore)
     p_get.add_argument("url", help="URL to look up.")
     p_get.set_defaults(func=commands.cmd_get)
 
@@ -59,13 +63,13 @@ def build_parser():
         "totp",
         help="Get the current TOTP for an entry UUID.",
         description=(
-            "Reads keepassxc associations from <file> and attempts to get the "
-            "current TOTP for <uuid>. Each stored association is tried until "
-            "one authenticates. Exits with 1 if no association authenticates "
-            "or no TOTP is found."
+            "Reads keepassxc associations from the keystore file and attempts "
+            "to get the current TOTP for <uuid>. Each stored association is "
+            "tried until one authenticates. Exits with 1 if no association "
+            "authenticates or no TOTP is found."
         ),
     )
-    p_totp.add_argument("file", help="Path to the keystore JSON file.")
+    _add_file_arg(p_totp, default_keystore)
     p_totp.add_argument("uuid", help="Entry UUID.")
     p_totp.set_defaults(func=commands.cmd_totp)
 
@@ -78,7 +82,7 @@ def build_parser():
             "already unlocked it has no effect."
         ),
     )
-    p_unlock.add_argument("file", nargs="?", default=None, help=_FILE_HELP)
+    _add_file_arg(p_unlock, default_keystore)
     p_unlock.set_defaults(func=commands.cmd_unlock)
 
     return parser

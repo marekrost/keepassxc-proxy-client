@@ -6,10 +6,6 @@ import keepassxc_proxy_client.protocol
 from keepassxc_proxy_client import keystore
 
 
-def _resolve_path(args):
-    return args.file if args.file else keystore.default_path()
-
-
 def _authenticate(connection, path):
     """Try every association stored at `path` until one authenticates.
 
@@ -43,7 +39,7 @@ def cmd_create(args):
     name, public_key = connection.dump_associate()
 
     if args.save:
-        path = _resolve_path(args)
+        path = args.file
         try:
             keystore.save(path, name, public_key, force=args.force)
         except keystore.AssociationExists as e:
@@ -63,7 +59,7 @@ def cmd_create(args):
 
 
 def cmd_get(args):
-    path = _resolve_path(args)
+    path = args.file
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
@@ -79,7 +75,7 @@ def cmd_get(args):
 
 
 def cmd_totp(args):
-    path = _resolve_path(args)
+    path = args.file
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
@@ -95,7 +91,7 @@ def cmd_totp(args):
 
 
 def cmd_unlock(args):
-    path = _resolve_path(args)
+    path = args.file
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
