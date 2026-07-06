@@ -6,20 +6,36 @@ import keepassxc_proxy_client.protocol
 from keepassxc_proxy_client import keystore
 
 
-def _authenticate(connection, path):
-    """Try every association stored at `path` until one authenticates.
+def _authenticate(connection, path, assoc_id=None):
+    """Authenticate against a keystore.
+
+    If `assoc_id` is given, only that association is tried. Otherwise every
+    stored association is tried until one authenticates.
 
     Returns True on success. Prints a diagnostic and returns False if the
-    keystore is empty or no candidate authenticated.
+    keystore is empty, the requested id is missing, or no candidate
+    authenticated.
     """
+    if assoc_id is not None:
+        try:
+            key_bytes = keystore.load(path, assoc_id)
+        except keystore.AssociationNotFound as e:
+            print(str(e))
+            return False
+        connection.load_associate(assoc_id, key_bytes)
+        if connection.test_associate():
+            return True
+        print("Association %r did not authenticate against the running KeePassXC instance" % assoc_id)
+        return False
+
     ids = keystore.list_associations(path)
     if not ids:
         print("No associations stored in %s" % path)
         return False
 
-    for assoc_id in ids:
-        key_bytes = keystore.load(path, assoc_id)
-        connection.load_associate(assoc_id, key_bytes)
+    for candidate in ids:
+        key_bytes = keystore.load(path, candidate)
+        connection.load_associate(candidate, key_bytes)
         if connection.test_associate():
             return True
 
@@ -63,7 +79,7 @@ def cmd_get(args):
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    if not _authenticate(connection, path):
+    if not _authenticate(connection, path, args.id):
         sys.exit(1)
 
     logins = connection.get_logins(args.url)
@@ -79,7 +95,7 @@ def cmd_totp(args):
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    if not _authenticate(connection, path):
+    if not _authenticate(connection, path, args.id):
         sys.exit(1)
 
     totp_value = connection.get_totp(args.uuid)
@@ -95,7 +111,7 @@ def cmd_unlock(args):
 
     connection = keepassxc_proxy_client.protocol.Connection()
     connection.connect()
-    if not _authenticate(connection, path):
+    if not _authenticate(connection, path, args.id):
         sys.exit(1)
 
     print(connection.test_associate(True))

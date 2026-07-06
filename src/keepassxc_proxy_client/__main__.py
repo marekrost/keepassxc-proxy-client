@@ -12,6 +12,19 @@ def _add_file_arg(p, default):
     )
 
 
+def _add_id_arg(p):
+    p.add_argument(
+        "--id",
+        "-i",
+        dest="id",
+        default=None,
+        help=(
+            "Association id to use. If omitted, all stored associations are tried "
+            "in turn until one authenticates successfully."
+        ),
+    )
+
+
 def build_parser():
     default_keystore = keystore.default_path()
     parser = argparse.ArgumentParser(
@@ -56,6 +69,7 @@ def build_parser():
         ),
     )
     _add_file_arg(p_get, default_keystore)
+    _add_id_arg(p_get)
     p_get.add_argument("url", help="URL to look up.")
     p_get.set_defaults(func=commands.cmd_get)
 
@@ -70,6 +84,7 @@ def build_parser():
         ),
     )
     _add_file_arg(p_totp, default_keystore)
+    _add_id_arg(p_totp)
     p_totp.add_argument("uuid", help="Entry UUID.")
     p_totp.set_defaults(func=commands.cmd_totp)
 
@@ -83,6 +98,7 @@ def build_parser():
         ),
     )
     _add_file_arg(p_unlock, default_keystore)
+    _add_id_arg(p_unlock)
     p_unlock.set_defaults(func=commands.cmd_unlock)
 
     return parser
